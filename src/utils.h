@@ -3,9 +3,11 @@
 * Fonctions utilitaires, laboratoire 3, SETR
 *
 * Fonctions accomplissant diverses tâches nécessaires au traitement des images.
-* Toutes ces fonctions sont déjà implémentées pour vous dans utils.c
+* La plupart de ces fonctions sont déjà implémentées pour vous dans utils.c,
+* la seule fonction que VOUS avez à implémenter est appliquerOrdonnancement
+* (voir sa description plus bas).
 *
-* Marc-André Gardner, Hiver 2025
+* Marc-André Gardner, Hiver 2026
 * Merci à Yannick Hold-Geoffroy pour l'implémentation des fonctions de
 * redimensionnement et de filtrage.
 ******************************************************************************/
@@ -17,13 +19,42 @@
 #include <string.h>
 #include <stdint.h>	
 #include <time.h>
+#include <inttypes.h>
+#include <sched.h>
+#include <errno.h>
+#include <linux/sched.h>
 #include "allocateurMemoire.h"
 
-// Definition des modes d'ordonnancement possibles
-#define ORDONNANCEMENT_NORT 1
-#define ORDONNANCEMENT_RR 2
-#define ORDONNANCEMENT_FIFO 3
-#define ORDONNANCEMENT_DEADLINE 4
+#define ORDONNANCEMENT_NORT 0
+#define ORDONNANCEMENT_RR 1
+#define ORDONNANCEMENT_FIFO 2
+#define ORDONNANCEMENT_DEADLINE 3
+
+// Structure contenant les paramètres d'ordonnancement
+// Attention, le paramètres pour deadline sont conservés en millisecondes (tels
+// que reçus sur la ligne de commande), alors que la valeur à utiliser avec 
+// sched_setattr doit être en nanosecondes!
+struct SchedParams {
+    int modeOrdonnanceur;
+    unsigned int runtime;   // en millisecondes, tel que reçu sur la ligne de commande
+    unsigned int deadline;  // en millisecondes, tel que reçu sur la ligne de commande
+    unsigned int period;    // en millisecondes, tel que reçu sur la ligne de commande
+};
+
+// Parse l'argument suivant l'option -s (type d'ordonnanceur: NORT, RR, FIFO, DEADLINE)
+// et initialise le champ modeOrdonnanceur dans la structure SchedParams.
+// Retourne 0 en cas de succès, -1 si le mode n'est pas reconnu (utilise NORT par défaut)
+int parseSchedOption(const char* arg, struct SchedParams* params);
+
+// Parse l'argument suivant l'option -d (runtime,deadline,period en millisecondes)
+// et initialise les champs correspondants dans la structure SchedParams.
+int parseDeadlineParams(char* arg, struct SchedParams* params);
+
+// Applique les paramètres d'ordonnancement au processus courant
+// La chaîne de caractères nomProgramme est utilisée pour les messages d'erreur
+// Retourne 0 en cas de succès, -1 en cas d'erreur
+// TODO : implémenter cette fonction dans utils.c
+int appliquerOrdonnancement(const struct SchedParams* params, const char* nomProgramme);
 
 #define ETAT_INDEFINI 0
 #define ETAT_INITIALISATION 10
@@ -38,6 +69,7 @@
 #define PROFILAGE_INTERVALLE_SAUVEGARDE_SEC 4
 #define PROFILAGE_TAILLE_INIT 30 * 5 * 30 * PROFILAGE_INTERVALLE_SAUVEGARDE_SEC * 4
 
+
 /* Data structures */
 typedef struct {
     unsigned int width, height;
@@ -48,6 +80,7 @@ typedef struct {
     unsigned int *i, *j;
     float *i_f, *j_f;
 } ResizeGrid;
+
 
 typedef struct{
     char *data;
@@ -105,10 +138,9 @@ void convertToGray(const unsigned char* input, const unsigned int in_height, con
 // Enregistre l'image dans un fichier PPM dont le nom est passé en paramètre
 void enregistreImage(const unsigned char* input, const unsigned int in_height, const unsigned int in_width, const unsigned int n_channels, const char* nomfichier);
 
-// Initialise l'enregistrement des informations de profilage
+
 void initProfilage(InfosProfilage *dataprof, const char *chemin_enregistrement);
 
-// Signale un nouvel evenement au profileur
 void evenementProfilage(InfosProfilage *dataprof, unsigned int type);
 
 #endif

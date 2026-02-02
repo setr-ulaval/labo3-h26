@@ -1,7 +1,7 @@
 /******************************************************************************
  * Laboratoire 3
  * GIF-3004 Systèmes embarqués temps réel
- * Hiver 2025
+ * Hiver 2026
  * Marc-André Gardner
  * 
  * Fichier implémentant les fonctions utilitaires telles que déclarées dans utils.h
@@ -11,6 +11,50 @@
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
+
+
+// Applique les paramètres d'ordonnancement au processus courant
+int appliquerOrdonnancement(const struct SchedParams* params, const char* nomProgramme) {
+    // TODO : implémenter cette fonction
+}
+
+// Parse l'option -s (type d'ordonnanceur: NORT, RR, FIFO, DEADLINE)
+int parseSchedOption(const char* arg, struct SchedParams* params) {
+    if (strcmp(arg, "NORT") == 0) {
+        params->modeOrdonnanceur = ORDONNANCEMENT_NORT;
+    } else if (strcmp(arg, "RR") == 0) {
+        params->modeOrdonnanceur = ORDONNANCEMENT_RR;
+    } else if (strcmp(arg, "FIFO") == 0) {
+        params->modeOrdonnanceur = ORDONNANCEMENT_FIFO;
+    } else if (strcmp(arg, "DEADLINE") == 0) {
+        params->modeOrdonnanceur = ORDONNANCEMENT_DEADLINE;
+    } else {
+        params->modeOrdonnanceur = ORDONNANCEMENT_NORT;
+        printf("Mode d'ordonnancement %s non valide, defaut sur NORT\n", arg);
+        return -1;
+    }
+    return 0;
+}
+
+// Parse l'argument suivant l'option -d (runtime,deadline,period en millisecondes)
+int parseDeadlineParams(char* arg, struct SchedParams* params) {
+    int paramIndex = 0;
+    char* splitString = strtok(arg, ",");
+    while (splitString != NULL) {
+        unsigned int value = (unsigned int)atoi(splitString);
+        if (paramIndex == 0) {
+            params->runtime = value;
+        } else if (paramIndex == 1) {
+            params->deadline = value;
+        } else {
+            params->period = value;
+            break;
+        }
+        paramIndex++;
+        splitString = strtok(NULL, ",");
+    }
+    return 0;
+}
 
 
 /* Convolution with repeat mode */
@@ -261,15 +305,13 @@ void resizeNearestNeighbor(const unsigned char* input, const unsigned int in_hei
                unsigned char* output, const unsigned int out_height, const unsigned int out_width,
                const ResizeGrid rg, const unsigned int n_channels)
 {
-    unsigned char *input_cont = (unsigned char*)tempsreel_malloc(in_height * in_width * n_channels * sizeof(unsigned char));
-    unsigned char *output_cont = (unsigned char*)tempsreel_malloc(out_height * out_width * n_channels * sizeof(unsigned char));
-
     if (n_channels > 1) {
+        unsigned char *input_cont = (unsigned char*)tempsreel_malloc(in_height * in_width * n_channels * sizeof(unsigned char));
+        unsigned char *output_cont = (unsigned char*)tempsreel_malloc(out_height * out_width * n_channels * sizeof(unsigned char));
         _permuteRGB_char(in_height, in_width, input_cont, n_channels, input);
         for (unsigned int i = 0; i < n_channels; ++i) {
             _ul_nearestneighbors_regulargrid(input_cont + (in_height*in_width)*i, in_width, rg.i, rg.j, out_height*out_width, output_cont + (out_height*out_width)*i);
         }
-
 
         for (unsigned int i = 0; i < out_height; ++i) {
             for (unsigned int j = 0; j < out_width; ++j) {
@@ -278,12 +320,13 @@ void resizeNearestNeighbor(const unsigned char* input, const unsigned int in_hei
                 }
             }
         }
+
+        tempsreel_free(input_cont);
+        tempsreel_free(output_cont);
     } else {
         _ul_nearestneighbors_regulargrid(input, in_width, rg.i, rg.j, out_height*out_width, output);
     }
 
-    tempsreel_free(input_cont);
-    tempsreel_free(output_cont);
 }
 
 void resizeBilinear(const unsigned char* input, const unsigned int in_height, const unsigned int in_width,
@@ -316,13 +359,33 @@ void resizeBilinear(const unsigned char* input, const unsigned int in_height, co
 
 void convertToGray(const unsigned char* input, const unsigned int in_height, const unsigned int in_width, const unsigned int n_channels,
                     unsigned char* output){
-
-    for (unsigned int i = 0; i < in_height; ++i) {
-        for (unsigned int j = 0; j < in_width; ++j) {
-            output[(i*in_width + j)] = (unsigned char)(0.114*(float)input[(i*in_width+j)*n_channels] +
-                    0.587*(float)input[(i*in_width+j)*n_channels + 1] +
-                    0.299*(float)input[(i*in_width+j)*n_channels + 2]);
-        }
+    // =========================================================================
+    // OPTIMISATION POUR ARMv6 (Pi Zero W) : Arithmétique entière
+    // =========================================================================
+    // Le Pi Zero W n'a pas de FPU performante (VFPv2 très lent).
+    // On remplace les calculs flottants par de l'arithmétique en point fixe.
+    //
+    // Formule originale (ITU-R BT.601) :
+    //   Y = 0.114*B + 0.587*G + 0.299*R
+    //
+    // Conversion en point fixe (facteur 256 = 2^8) :
+    //   0.114 * 256 ≈ 29
+    //   0.587 * 256 ≈ 150  
+    //   0.299 * 256 ≈ 77
+    //   Total = 256, donc on divise par 256 avec un décalage >> 8
+    //
+    // Ceci évite toutes les conversions float et opérations FPU.
+    // =========================================================================
+    
+    const unsigned int total_pixels = in_height * in_width;
+    const unsigned char *src = input;
+    unsigned char *dst = output;
+    
+    for (unsigned int idx = 0; idx < total_pixels; ++idx) {
+        // Calcul en arithmétique entière : (29*B + 150*G + 77*R) >> 8
+        // Les coefficients sont pour BGR (ordre utilisé dans le projet)
+        *dst++ = (unsigned char)((29 * src[0] + 150 * src[1] + 77 * src[2]) >> 8);
+        src += n_channels;
     }
 }
 
@@ -332,16 +395,14 @@ void enregistreImage(const unsigned char* input, const unsigned int in_height, c
     fprintf(f, "P3\n%d %d\n%d\n", in_width, in_height, 255);
     if(n_channels == 1){
         for (unsigned int i=0; i<in_width*in_height; i++)
-            fprintf(f," %d %d %d \n", input[i], input[i], input[i]);
+            fprintf(f,"%d %d %d ", input[i], input[i], input[i]);
     }
     else{
     for (unsigned int i=0; i<in_width*in_height*3; i+=3)
-        fprintf(f," %d %d %d \n", input[i], input[i+1], input[i+2]);
+        fprintf(f,"%d %d %d ", input[i], input[i+1], input[i+2]);
     }
     fclose(f);
 }
-
-
 
 void initProfilage(InfosProfilage *dataprof, const char *chemin_enregistrement){
     if(PROFILAGE_ACTIF == 0){

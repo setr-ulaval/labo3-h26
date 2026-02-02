@@ -1,9 +1,9 @@
 /******************************************************************************
- * Laboratoire 3
- * GIF-3004 Systèmes embarqués temps réel
- * Hiver 2025
- * Marc-André Gardner
- * 
+* Laboratoire 3
+* GIF-3004 Systèmes embarqués temps réel
+* Hiver 2026
+* Marc-André Gardner
+* 
 * Programme compositeur
 *
 * Récupère plusieurs flux vidéos à partir d'espaces mémoire partagés et les
@@ -56,10 +56,6 @@
 #include <err.h>
 #include <errno.h>
 
-// Nécessaire pour pouvoir utiliser sched_setattr et le mode DEADLINE
-#include <sched.h>
-#include "schedsupp.h"
-
 #include "allocateurMemoire.h"
 #include "commMemoirePartagee.h"
 #include "utils.h"
@@ -68,10 +64,10 @@
 // Fonction permettant de récupérer le temps courant sous forme double
 double get_time()
 {
-	struct timeval t;
-	struct timezone tzp;
-	gettimeofday(&t, &tzp);
-	return (double)t.tv_sec + (double)(t.tv_usec)*1e-6;
+    struct timeval t;
+    struct timezone tzp;
+    gettimeofday(&t, &tzp);
+    return (double)t.tv_sec + (double)(t.tv_usec)*1e-6;
 }
 
 
@@ -87,113 +83,113 @@ double get_time()
 // Le huitième est la longueur effective d'une ligne du framebuffer (en octets), contenue dans finfo.line_length dans la fonction main().
 // Le neuvième argument est le buffer contenant l'image à afficher, et les trois derniers arguments ses dimensions.
 void ecrireImage(const int position, const int total,
-					int fbfd, unsigned char* fb, size_t largeurFB, size_t hauteurFB, struct fb_var_screeninfo *vinfoPtr, int fbLineLength,
-					const unsigned char *data, size_t hauteurSource, size_t largeurSource, size_t canauxSource){
-	static int currentPage = 0;
-	static unsigned char* imageGlobale = NULL;
-	if(imageGlobale == NULL)
-		imageGlobale = (unsigned char*)calloc(fbLineLength*hauteurFB, 1);
+                    int fbfd, unsigned char* fb, size_t largeurFB, size_t hauteurFB, struct fb_var_screeninfo *vinfoPtr, int fbLineLength,
+                    const unsigned char *data, size_t hauteurSource, size_t largeurSource, size_t canauxSource){
+    static int currentPage = 0;
+    static unsigned char* imageGlobale = NULL;
+    if(imageGlobale == NULL)
+        imageGlobale = (unsigned char*)calloc(fbLineLength*hauteurFB, 1);
 
-	currentPage = (currentPage+1) % 2;
-	unsigned char *currentFramebuffer = fb + currentPage * fbLineLength * hauteurFB;
+    currentPage = (currentPage+1) % 2;
+    unsigned char *currentFramebuffer = fb + currentPage * fbLineLength * hauteurFB;
 
-	if(position >= total){
-		return;
-	}
+    if(position >= total){
+        return;
+    }
 
-	const unsigned char *dataTraite = data;
-	unsigned char* d = NULL;
-	if(canauxSource == 1){
-		d = (unsigned char*)tempsreel_malloc(largeurSource*hauteurSource*3);
-		unsigned int pos = 0;
-		for(unsigned int i=0; i < hauteurSource; ++i){
-			for(unsigned int j=0; j < largeurSource; ++j){
-				d[pos++] = data[i*largeurSource + j];
-				d[pos++] = data[i*largeurSource + j];
-				d[pos++] = data[i*largeurSource + j];
-			}
-		}
-		dataTraite = d;
-	}
+    const unsigned char *dataTraite = data;
+    unsigned char* d = NULL;
+    if(canauxSource == 1){
+        d = (unsigned char*)tempsreel_malloc(largeurSource*hauteurSource*3);
+        unsigned int pos = 0;
+        for(unsigned int i=0; i < hauteurSource; ++i){
+            for(unsigned int j=0; j < largeurSource; ++j){
+                d[pos++] = data[i*largeurSource + j];
+                d[pos++] = data[i*largeurSource + j];
+                d[pos++] = data[i*largeurSource + j];
+            }
+        }
+        dataTraite = d;
+    }
 
 
-	if(total == 1){
-		// Une seule image en plein écran
-		for(unsigned int ligne=0; ligne < hauteurSource; ligne++){
-			memcpy(currentFramebuffer + ligne * fbLineLength, dataTraite + ligne * largeurSource * 3, largeurFB * 3);
-		}
-	}
-	else if(total == 2){
-		// Deux images
-		if(position == 0){
-			// Image du haut
-			for(unsigned int ligne=0; ligne < hauteurSource; ligne++){
-				memcpy(imageGlobale + ligne * fbLineLength, dataTraite + ligne * largeurSource * 3, largeurFB * 3);
-			}
-		}
-		else{
-			// Image du bas
-			for(unsigned int ligne=hauteurSource; ligne < hauteurSource*2; ligne++){
-				memcpy(imageGlobale + ligne * fbLineLength, dataTraite + (ligne-hauteurSource) * largeurSource * 3, largeurFB * 3);
-			}
-		}
-	}
-	else if(total == 3 || total == 4){
-		// 3 ou 4 images
-		off_t offsetLigne = 0;
-		off_t offsetColonne = 0;
-		switch (position) {
-			case 0:
-				// En haut, à gauche
-				break;
-			case 1:
-				// En haut, à droite
-				offsetColonne = largeurSource;
-				break;
-			case 2:
-				// En bas, à gauche
-				offsetLigne = hauteurSource;
-				break;
-			case 3:
-				// En bas, à droite
-				offsetLigne = hauteurSource;
-				offsetColonne = largeurSource;
-				break;
-		}
-		// On copie les données ligne par ligne
-		offsetLigne *= fbLineLength;
-		offsetColonne *= 3;
-		for(unsigned int ligne=0; ligne < hauteurSource; ligne++){
-			memcpy(imageGlobale + offsetLigne + offsetColonne, dataTraite + ligne * largeurSource * 3, largeurSource * 3);
-			offsetLigne += fbLineLength;
-		}
-	}
+    if(total == 1){
+        // Une seule image en plein écran
+        for(unsigned int ligne=0; ligne < hauteurSource; ligne++){
+            memcpy(currentFramebuffer + ligne * fbLineLength, dataTraite + ligne * largeurSource * 3, largeurFB * 3);
+        }
+    }
+    else if(total == 2){
+        // Deux images
+        if(position == 0){
+            // Image du haut
+            for(unsigned int ligne=0; ligne < hauteurSource; ligne++){
+                memcpy(imageGlobale + ligne * fbLineLength, dataTraite + ligne * largeurSource * 3, largeurFB * 3);
+            }
+        }
+        else{
+            // Image du bas
+            for(unsigned int ligne=hauteurSource; ligne < hauteurSource*2; ligne++){
+                memcpy(imageGlobale + ligne * fbLineLength, dataTraite + (ligne-hauteurSource) * largeurSource * 3, largeurFB * 3);
+            }
+        }
+    }
+    else if(total == 3 || total == 4){
+        // 3 ou 4 images
+        off_t offsetLigne = 0;
+        off_t offsetColonne = 0;
+        switch (position) {
+            case 0:
+                // En haut, à gauche
+                break;
+            case 1:
+                // En haut, à droite
+                offsetColonne = largeurSource;
+                break;
+            case 2:
+                // En bas, à gauche
+                offsetLigne = hauteurSource;
+                break;
+            case 3:
+                // En bas, à droite
+                offsetLigne = hauteurSource;
+                offsetColonne = largeurSource;
+                break;
+        }
+        // On copie les données ligne par ligne
+        offsetLigne *= fbLineLength;
+        offsetColonne *= 3;
+        for(unsigned int ligne=0; ligne < hauteurSource; ligne++){
+            memcpy(imageGlobale + offsetLigne + offsetColonne, dataTraite + ligne * largeurSource * 3, largeurSource * 3);
+            offsetLigne += fbLineLength;
+        }
+    }
 
-	if(total > 1)
-		memcpy(currentFramebuffer, imageGlobale, fbLineLength*hauteurFB);
+    if(total > 1)
+        memcpy(currentFramebuffer, imageGlobale, fbLineLength*hauteurFB);
         
-        if(canauxSource == 1)
-		tempsreel_free(d);
+    if(canauxSource == 1)
+        tempsreel_free(d);
         
-	vinfoPtr->yoffset = currentPage * vinfoPtr->yres;
-	vinfoPtr->activate = FB_ACTIVATE_VBL;
-	if (ioctl(fbfd, FBIOPAN_DISPLAY, vinfoPtr)) {
-		printf("Erreur lors du changement de buffer (double buffering inactif)!\n");
-	}
+    vinfoPtr->yoffset = currentPage * vinfoPtr->yres;
+    vinfoPtr->activate = FB_ACTIVATE_VBL;
+    if (ioctl(fbfd, FBIOPAN_DISPLAY, vinfoPtr)) {
+        printf("Erreur lors du changement de buffer (double buffering inactif)!\n");
+    }
 }
 
 
 
 int main(int argc, char* argv[])
 {
-    // TODO
+    // TODO TODO TODO
     // ÉCRIVEZ ICI votre code d'analyse des arguments du programme et d'initialisation des zones mémoire partagées
     int nbrActifs;      // Après votre initialisation, cette variable DOIT contenir le nombre de flux vidéos actifs (de 1 à 4 inclusivement).
     
     // On desactive le buffering pour les printf(), pour qu'il soit possible de les voir depuis votre ordinateur
-	setbuf(stdout, NULL);
-	
-	// Initialise le profilage
+    setbuf(stdout, NULL);
+    
+    // Initialise le profilage
     char signatureProfilage[128] = {0};
     char* nomProgramme = (argv[0][0] == '.') ? argv[0]+2 : argv[0];
     snprintf(signatureProfilage, 128, "profilage-%s-%u.txt", nomProgramme, (unsigned int)getpid());
@@ -225,35 +221,35 @@ int main(int argc, char* argv[])
 
     // On choisit la bonne résolution
     vinfo.bits_per_pixel = 24;
-	switch (nbrActifs) {
-		case 1:
-			vinfo.xres = 427;
-			vinfo.yres = 240;
-			break;
-		case 2:
-			vinfo.xres = 427;
-			vinfo.yres = 480;
-			break;
-		case 3:
-		case 4:
-			vinfo.xres = 854;
-			vinfo.yres = 480;
-			break;
-		default:
-			printf("Nombre de sources invalide!\n");
-			return -1;
-			break;
-	}
+    switch (nbrActifs) {
+        case 1:
+            vinfo.xres = 427;
+            vinfo.yres = 240;
+            break;
+        case 2:
+            vinfo.xres = 427;
+            vinfo.yres = 480;
+            break;
+        case 3:
+        case 4:
+            vinfo.xres = 854;
+            vinfo.yres = 480;
+            break;
+        default:
+            printf("Nombre de sources invalide!\n");
+            return -1;
+            break;
+    }
 
     vinfo.xres_virtual = vinfo.xres;
     vinfo.yres_virtual = vinfo.yres * 2;
     if (ioctl(fbfd, FBIOPUT_VSCREENINFO, &vinfo)) {
-		perror("Erreur lors de l'appel a ioctl ");
+        perror("Erreur lors de l'appel a ioctl ");
     }
 
     // On récupère les "vraies" paramètres du framebuffer
     if (ioctl(fbfd, FBIOGET_FSCREENINFO, &finfo)) {
-		perror("Erreur lors de l'appel a ioctl (2) ");
+        perror("Erreur lors de l'appel a ioctl (2) ");
     }
 
     // On fait un mmap pour avoir directement accès au framebuffer
@@ -261,8 +257,8 @@ int main(int argc, char* argv[])
     unsigned char *fbp = (unsigned char*)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
 
     if (fbp == MAP_FAILED) {
-		perror("Erreur lors du mmap de l'affichage ");
-		return -1;
+        perror("Erreur lors du mmap de l'affichage ");
+        return -1;
     }
 
 
@@ -270,8 +266,10 @@ int main(int argc, char* argv[])
             // Boucle principale du programme
             // TODO
             // Appelez ici ecrireImage() avec les images provenant des différents flux vidéo
-            // Attention à ne pas mélanger les flux, et à ne pas bloquer sur un mutex (ce qui
-            // bloquerait l'interface entière)
+            // Attention à ne pas mélanger les flux, et à ne pas bloquer sur un mutex ou une
+            // condition (ce qui bloquerait l'interface entière). attenteLecteurAsync() pourra
+            // vous être très utile ici!
+            //
             // Nous vous conseillons d'implémenter une limitation du nombre de FPS (images par
             // seconde), nombre qui est spécifié pour chaque flux. Il est inutile d'aller plus
             // vite que le nombre de FPS demandé, et cela consomme plus de ressources, ce qui
