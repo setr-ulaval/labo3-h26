@@ -442,7 +442,7 @@ Vous pouvez connaître la vitesse d'horloge *courante* du processeur en utilisan
 
 ### 8.2. Mise en veille de la sortie HDMI
 
-Par défaut, le Raspberry Pi Zero met en veille son GPU lorsqu'il n'y a pas d'interaction depuis un certain temps. Étant donné que vous accéderez au Raspberry Pi à distance, ce comportement est fâcheux. Si cela vous arrive, vous pouvez l'éviter en éditant (en mode sudo) le fichier /boot/cmdline.txt, et ajoutez, à la fin de la ligne, le texte `consoleblank=0`.
+Par défaut, le Raspberry Pi Zero met en veille son GPU lorsqu'il n'y a pas d'interaction depuis un certain temps. Étant donné que vous accéderez au Raspberry Pi à distance, ce comportement est fâcheux. Si cela vous arrive, vous pouvez l'éviter en éditant (en mode sudo) le fichier /boot/firmware/cmdline.txt, et ajoutez, à la fin de la ligne, le texte `consoleblank=0`.
 
 ### 8.3. Nombre de FPS typique pour chaque configuration
 
